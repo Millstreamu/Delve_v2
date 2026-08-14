@@ -8,8 +8,6 @@ var player_timer_bar: Dictionary
 var enemy_name_label: Label
 var status_labels: Dictionary = {}
 var equipment_labels: Dictionary = {}
-var draw_label: Label
-var log_label: Label
 var cards: HBoxContainer
 var overlay: ColorRect
 var result_label: Label
@@ -49,15 +47,6 @@ func _build_ui() -> void:
 	enemy_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_place_abs(layer, enemy_art, 450, 152, 380, 214)
 
-	# Element icon row (top-left).
-	var icons := ["blade", "fire", "guard", "arcane", "nature"]
-	for i in icons.size():
-		var t := TextureRect.new()
-		t.texture = load("res://assets/icons/%s.png" % icons[i])
-		t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		t.stretch_mode = TextureRect.STRETCH_SCALE
-		_place_abs(layer, t, 14 + i * 52, 12, 46, 46)
-
 	# Status counters (top-right).
 	_build_status_counters(layer)
 
@@ -80,45 +69,11 @@ func _build_ui() -> void:
 	# Equipment slots (right of hand).
 	_build_equipment_grid(layer)
 
-	# Bottom-left controls.
-	var end_btn := _ui_button("END TURN", Color("29406a"), Color("6ea0e0"))
-	end_btn.pressed.connect(func(): model.player_progress = 0.0)
-	_place_abs(layer, end_btn, 14, 590, 188, 46)
-	var menu_btn := _ui_button("MENU", Color("1a2233"), Color("8497b5"))
-	_place_abs(layer, menu_btn, 14, 642, 188, 38)
-
-	# Player portrait + level.
-	var portrait := TextureRect.new()
-	portrait.texture = load("res://assets/icons/portrait.png")
-	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	portrait.stretch_mode = TextureRect.STRETCH_SCALE
-	_place_abs(layer, portrait, 212, 588, 76, 92)
-	var lvl := _label(15)
-	lvl.text = "5"
-	lvl.add_theme_color_override("font_color", Color("f4ecd6"))
-	var lvl_bg := StyleBoxFlat.new(); lvl_bg.bg_color = Color("101a2c"); lvl_bg.border_color = Color("4d8fd6"); lvl_bg.set_border_width_all(2); lvl_bg.set_corner_radius_all(4)
-	lvl.add_theme_stylebox_override("normal", lvl_bg)
-	_place_abs(layer, lvl, 268, 654, 28, 26)
-
-	# Player bars (bottom-centre).
+	# Player bars (bottom-left).
 	player_health_bar = _make_stat_bar(HP_FRAME, HP_FILL, HP_INNER, HEALTH_BAR_SIZE, true)
-	_place_abs(layer, player_health_bar.root, 306, 586, HEALTH_BAR_SIZE.x, HEALTH_BAR_SIZE.y)
+	_place_abs(layer, player_health_bar.root, 24, 596, HEALTH_BAR_SIZE.x, HEALTH_BAR_SIZE.y)
 	player_timer_bar = _make_stat_bar(TIMER_FRAME, TIMER_FILL, TIMER_INNER, TIMER_BAR_SIZE, false)
-	_place_abs(layer, player_timer_bar.root, 306, 644, TIMER_BAR_SIZE.x, TIMER_BAR_SIZE.y)
-
-	# Draw pile (bottom-right).
-	var draw_btn := _ui_button("", Color("2a1c3e"), Color("a06ad4"))
-	_place_abs(layer, draw_btn, 992, 600, 248, 66)
-	draw_label = _label(20)
-	draw_label.add_theme_color_override("font_color", Color("e8dcff"))
-	draw_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_place_abs(layer, draw_label, 992, 600, 248, 66)
-
-	# Battle log (subtle, bottom-centre).
-	log_label = _label(14)
-	log_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	log_label.add_theme_color_override("font_color", Color("7f8ba6"))
-	_place_abs(layer, log_label, 306, 696, HEALTH_BAR_SIZE.x, 22)
+	_place_abs(layer, player_timer_bar.root, 24, 654, TIMER_BAR_SIZE.x, TIMER_BAR_SIZE.y)
 
 	overlay = ColorRect.new(); overlay.color = Color(0.02, 0.03, 0.06, 0.9); overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); overlay.hide(); add_child(overlay)
 	var result_box := VBoxContainer.new(); result_box.set_anchors_preset(Control.PRESET_CENTER); result_box.position = Vector2(-150, -70); result_box.size = Vector2(300, 140); overlay.add_child(result_box)
@@ -135,11 +90,9 @@ func _refresh() -> void:
 	status_labels["heart"].text = "%d" % model.get_stat("attack")
 	status_labels["plus"].text = "%d" % model.get_stat("power")
 	status_labels["wing"].text = "%d" % model.get_stat("speed")
-	draw_label.text = "DRAW   ✦ %d" % model.draw_pile.size()
 	for slot: String in equipment_labels:
 		var item: Dictionary = model.equipment[slot]
 		equipment_labels[slot].text = _equipment_text(slot, item)
-	log_label.text = model.battle_log
 	_refresh_abilities()
 
 func _place_abs(parent: Control, node: Control, x: float, y: float, w: float, h: float) -> void:
@@ -148,20 +101,6 @@ func _place_abs(parent: Control, node: Control, x: float, y: float, w: float, h:
 	node.size = Vector2(w, h)
 	parent.add_child(node)
 
-func _ui_button(text: String, bg: Color, border: Color) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.add_theme_font_size_override("font_size", 18)
-	b.add_theme_color_override("font_color", Color("f0ead8"))
-	for state in ["normal", "hover", "pressed"]:
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = bg.lightened(0.12) if state == "hover" else bg
-		sb.border_color = border
-		sb.set_border_width_all(2)
-		sb.set_corner_radius_all(6)
-		sb.content_margin_top = 6; sb.content_margin_bottom = 6
-		b.add_theme_stylebox_override(state, sb)
-	return b
 
 func _build_status_counters(layer: Control) -> void:
 	var order := [["shield", "st_shield"], ["heart", "st_heart"], ["plus", "st_plus"], ["wing", "st_wing"]]
@@ -178,11 +117,6 @@ func _build_status_counters(layer: Control) -> void:
 		_place_abs(layer, num, x + 32, 14, 34, 26)
 		status_labels[pair[0]] = num
 		x += 66
-	var gear := TextureRect.new()
-	gear.texture = load("res://assets/icons/gear.png")
-	gear.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	gear.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_place_abs(layer, gear, 1234, 10, 34, 34)
 
 func _build_equipment_grid(layer: Control) -> void:
 	var slots := ["head", "chest", "legs", "boots", "left_hand", "right_hand"]
