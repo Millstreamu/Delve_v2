@@ -11,7 +11,15 @@ const DRAW_SIZE := 3
 var player_max_health := 40
 var player_health := 40
 var player_block := 0
-var player_speed := 10.0
+var base_stats := {"attack": 0, "power": 0, "defence": 0, "speed": 10}
+var equipment := {
+	"head": {"name": "Scout Hood", "speed": 1},
+	"chest": {"name": "Iron Cuirass", "defence": 2},
+	"legs": {"name": "Runed Greaves", "power": 1},
+	"boots": {"name": "Windstep Boots", "speed": 2},
+	"left_hand": {"name": "Warden Buckler", "defence": 2},
+	"right_hand": {"name": "Delver Sword", "attack": 2},
+}
 var player_progress := 0.0
 var enemy_max_health := 50
 var enemy_health := 50
@@ -47,7 +55,7 @@ func advance(delta: float) -> void:
 		return
 	# A ready player keeps their full gauge and current choices, but time does not
 	# stop: the enemy continues charging and attacking while the player decides.
-	player_progress = minf(TURN_THRESHOLD, player_progress + player_speed * TURN_PROGRESS_MULTIPLIER * delta)
+	player_progress = minf(TURN_THRESHOLD, player_progress + get_stat("speed") * TURN_PROGRESS_MULTIPLIER * delta)
 	enemy_progress += enemy_speed * TURN_PROGRESS_MULTIPLIER * delta
 	if player_progress >= TURN_THRESHOLD and state == "RUNNING":
 		_begin_player_turn()
@@ -61,9 +69,10 @@ func play_choice(index: int) -> void:
 	state = "RESOLVING"
 	var ability := choices[index]
 	var chained: bool = ability.chain_type != "" and ability.chain_type == last_ability_type
-	var damage: int = ability.damage + (ability.chain_damage if chained else 0)
-	var block: int = ability.block + (ability.chain_block if chained else 0)
-	var healing: int = ability.heal + (ability.chain_heal if chained else 0)
+	var effects := ability_effects(ability, chained)
+	var damage: int = effects.damage
+	var block: int = effects.block
+	var healing: int = effects.heal
 	enemy_health = maxi(0, enemy_health - damage)
 	player_block += block
 	player_health = mini(player_max_health, player_health + healing)
@@ -80,6 +89,38 @@ func play_choice(index: int) -> void:
 
 func chain_is_active(ability: Dictionary) -> bool:
 	return ability.chain_type != "" and ability.chain_type == last_ability_type
+
+func get_stat(stat: String) -> int:
+	var total: int = base_stats.get(stat, 0)
+	for item: Dictionary in equipment.values():
+		total += item.get(stat, 0)
+	return total
+
+func equip(slot: String, item: Dictionary) -> bool:
+	if not equipment.has(slot) or not item.has("name"):
+		return false
+	equipment[slot] = item.duplicate(true)
+	state_changed.emit()
+	return true
+
+func unequip(slot: String) -> bool:
+	if not equipment.has(slot):
+		return false
+	equipment[slot] = {}
+	state_changed.emit()
+	return true
+
+func ability_effects(ability: Dictionary, chained := false) -> Dictionary:
+	var damage: int = ability.damage + (ability.chain_damage if chained else 0)
+	var block: int = ability.block + (ability.chain_block if chained else 0)
+	var healing: int = ability.heal + (ability.chain_heal if chained else 0)
+	match ability.get("scales_with", ""):
+		"attack": damage += get_stat("attack")
+		"power":
+			if damage > 0: damage += get_stat("power")
+			if healing > 0: healing += get_stat("power")
+		"defence": block += get_stat("defence")
+	return {"damage": damage, "block": block, "heal": healing}
 
 func _begin_player_turn() -> void:
 	state = "PLAYER_TURN"
@@ -125,7 +166,8 @@ func _effect_summary(damage: int, block: int, healing: int) -> String:
 	return ", ".join(parts)
 
 func _card(name: String, type: String, damage := 0, block := 0, heal := 0, chain_type := "", chain_damage := 0, chain_block := 0, chain_heal := 0) -> Dictionary:
-	return {"name": name, "type": type, "damage": damage, "block": block, "heal": heal, "chain_type": chain_type, "chain_damage": chain_damage, "chain_block": chain_block, "chain_heal": chain_heal}
+	var scaling := "defence" if block > 0 else ("attack" if type == "BLADE" else "power")
+	return {"name": name, "type": type, "damage": damage, "block": block, "heal": heal, "chain_type": chain_type, "chain_damage": chain_damage, "chain_block": chain_block, "chain_heal": chain_heal, "scales_with": scaling}
 
 func _make_deck() -> Array[Dictionary]:
 	return [
