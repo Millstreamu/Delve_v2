@@ -4,6 +4,7 @@ var failures := 0
 
 func _init() -> void:
 	_test_deck_and_draw()
+	_test_turn_gauges_are_200_percent_faster()
 	_test_chain_damage_and_discard()
 	_test_block_and_enemy_attack()
 	_test_win_and_loss()
@@ -22,6 +23,12 @@ func _test_deck_and_draw() -> void:
 	model.advance(10.0)
 	check(model.state == "PLAYER_TURN", "Player reaches a turn based on speed")
 	check(model.choices.size() == 3 and model.draw_pile.size() == 17, "A player turn draws exactly three")
+
+func _test_turn_gauges_are_200_percent_faster() -> void:
+	var model := CombatModel.new(); model.start(456)
+	model.advance(1.0)
+	check(model.player_progress == 30.0, "Player turn gauge fills at 300% of its original rate")
+	check(model.enemy_progress == 21.0, "Enemy turn gauge fills at 300% of its original rate")
 
 func _test_chain_damage_and_discard() -> void:
 	var model := CombatModel.new(); model.start(1)

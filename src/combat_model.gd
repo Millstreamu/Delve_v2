@@ -5,6 +5,7 @@ signal state_changed
 signal combat_finished(result: String)
 
 const TURN_THRESHOLD := 100.0
+const TURN_PROGRESS_MULTIPLIER := 3.0
 const DRAW_SIZE := 3
 
 var player_max_health := 40
@@ -44,8 +45,8 @@ func start(seed_value: int = 0) -> void:
 func advance(delta: float) -> void:
 	if state != "RUNNING":
 		return
-	player_progress += player_speed * delta
-	enemy_progress += enemy_speed * delta
+	player_progress += player_speed * TURN_PROGRESS_MULTIPLIER * delta
+	enemy_progress += enemy_speed * TURN_PROGRESS_MULTIPLIER * delta
 	if player_progress >= TURN_THRESHOLD:
 		player_progress = TURN_THRESHOLD
 		_begin_player_turn()
