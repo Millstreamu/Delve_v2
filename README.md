@@ -1,0 +1,22 @@
+# Delve combat prototype
+
+A first playable Godot 4 implementation of the combat loop in [DESIGN.md](DESIGN.md): speed-based turns, temporary three-card choices, cross-turn chains, block, and win/lose states.
+
+## Setup and run
+
+Install [Godot 4.3 or newer](https://godotengine.org/download/archive/) and verify `godot` is on your `PATH`.
+
+```bash
+godot --editor project.godot
+# or launch the game directly
+godot --path .
+```
+
+## Validation
+
+The test runner uses only Godot itself; no add-ons or package installs are required.
+
+```bash
+godot --headless --path . --editor --quit
+godot --headless --path . --script tests/test_runner.gd
+```
