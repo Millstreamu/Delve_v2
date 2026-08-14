@@ -1,10 +1,10 @@
 extends Control
 
 var model := CombatModel.new()
-var enemy_hp: Label
-var enemy_bar: ProgressBar
-var player_hp: Label
-var player_bar: ProgressBar
+var enemy_health_bar: Dictionary
+var enemy_timer_bar: Dictionary
+var player_health_bar: Dictionary
+var player_timer_bar: Dictionary
 var chain_label: Label
 var log_label: Label
 var cards: HBoxContainer
@@ -34,12 +34,14 @@ func _build_ui() -> void:
 	add_child(margin)
 	var column := VBoxContainer.new(); column.add_theme_constant_override("separation", 12); margin.add_child(column)
 	var title := Label.new(); title.text = "D E L V E"; title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; title.add_theme_font_size_override("font_size", 28); title.modulate = Color("e7c778"); column.add_child(title)
-	enemy_hp = _label(24); column.add_child(enemy_hp)
-	enemy_bar = _bar(Color("d4515d")); column.add_child(enemy_bar)
-	var enemy_visual := Label.new(); enemy_visual.text = "◆\nTHE WARDEN"; enemy_visual.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; enemy_visual.add_theme_font_size_override("font_size", 34); enemy_visual.modulate = Color("ef6a74"); enemy_visual.custom_minimum_size.y = 72; column.add_child(enemy_visual)
+	enemy_health_bar = _make_stat_bar(HP_FRAME, HP_FILL, HP_INNER, HEALTH_BAR_SIZE, true)
+	enemy_timer_bar = _make_stat_bar(TIMER_FRAME, TIMER_FILL, TIMER_INNER, TIMER_BAR_SIZE, false)
+	column.add_child(_bar_row(enemy_health_bar, enemy_timer_bar))
+	var enemy_visual := Label.new(); enemy_visual.text = "◆  THE WARDEN"; enemy_visual.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; enemy_visual.add_theme_font_size_override("font_size", 30); enemy_visual.modulate = Color("ef6a74"); enemy_visual.custom_minimum_size.y = 46; column.add_child(enemy_visual)
 	var divider := HSeparator.new(); column.add_child(divider)
-	player_hp = _label(22); column.add_child(player_hp)
-	player_bar = _bar(Color("55c2a6")); column.add_child(player_bar)
+	player_health_bar = _make_stat_bar(HP_FRAME, HP_FILL, HP_INNER, HEALTH_BAR_SIZE, true)
+	player_timer_bar = _make_stat_bar(TIMER_FRAME, TIMER_FILL, TIMER_INNER, TIMER_BAR_SIZE, false)
+	column.add_child(_bar_row(player_health_bar, player_timer_bar))
 	chain_label = _label(16); chain_label.modulate = Color("e7c778"); column.add_child(chain_label)
 	log_label = _label(16); log_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; log_label.custom_minimum_size.y = 42; column.add_child(log_label)
 	cards = HBoxContainer.new(); cards.alignment = BoxContainer.ALIGNMENT_CENTER; cards.add_theme_constant_override("separation", 18); cards.size_flags_vertical = Control.SIZE_EXPAND_FILL; column.add_child(cards)
@@ -49,9 +51,10 @@ func _build_ui() -> void:
 	var again := Button.new(); again.text = "DELVE AGAIN"; again.custom_minimum_size.y = 48; again.pressed.connect(func(): overlay.hide(); model.start()); result_box.add_child(again)
 
 func _refresh() -> void:
-	enemy_hp.text = "THE WARDEN     %d / %d HP" % [model.enemy_health, model.enemy_max_health]
-	player_hp.text = "PLAYER     %d / %d HP     •     %d BLOCK" % [model.player_health, model.player_max_health, model.player_block]
-	enemy_bar.value = model.enemy_progress; player_bar.value = model.player_progress
+	_update_bar(enemy_health_bar, float(model.enemy_health) / model.enemy_max_health, "THE WARDEN    %d / %d" % [model.enemy_health, model.enemy_max_health])
+	_update_bar(player_health_bar, float(model.player_health) / model.player_max_health, "%d / %d HP    •    %d BLOCK" % [model.player_health, model.player_max_health, model.player_block])
+	_update_bar(enemy_timer_bar, model.enemy_progress / CombatModel.TURN_THRESHOLD, "")
+	_update_bar(player_timer_bar, model.player_progress / CombatModel.TURN_THRESHOLD, "")
 	chain_label.text = "LAST ABILITY: %s" % (model.last_ability_type if model.last_ability_type != "" else "NONE — start a chain")
 	log_label.text = model.battle_log
 	_refresh_abilities()
@@ -186,10 +189,80 @@ func _place(node: Control, rect: Rect2) -> void:
 func _label(size: int) -> Label:
 	var label := Label.new(); label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; label.add_theme_font_size_override("font_size", size); return label
 
-func _bar(color: Color) -> ProgressBar:
-	var bar := ProgressBar.new(); bar.max_value = CombatModel.TURN_THRESHOLD; bar.show_percentage = false; bar.custom_minimum_size.y = 14
-	var fill := StyleBoxFlat.new(); fill.bg_color = color; fill.corner_radius_top_left = 6; fill.corner_radius_top_right = 6; fill.corner_radius_bottom_left = 6; fill.corner_radius_bottom_right = 6; bar.add_theme_stylebox_override("fill", fill)
-	return bar
+# --- Art-based stat bars (health frame + fill, turn timer + fill) ------------
+const HP_FRAME := "res://assets/hp_frame.png"
+const HP_FILL := "res://assets/hp_fill.png"
+const TIMER_FRAME := "res://assets/timer_frame.png"
+const TIMER_FILL := "res://assets/timer_fill.png"
+# Inner fill channel of each frame, measured from the cropped sprites.
+const HP_INNER := Rect2(0.1489, 0.0696, 0.8223, 0.8797)
+const TIMER_INNER := Rect2(0.1340, 0.0652, 0.8482, 0.9293)
+const HEALTH_BAR_SIZE := Vector2(470, 53)
+const TIMER_BAR_SIZE := Vector2(360, 47)
+
+func _bar_row(left: Dictionary, right: Dictionary) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 22)
+	row.add_child(left.root)
+	row.add_child(right.root)
+	return row
+
+func _make_stat_bar(frame_path: String, fill_path: String, inner: Rect2, bar_size: Vector2, with_label: bool) -> Dictionary:
+	var root := Control.new()
+	root.custom_minimum_size = bar_size
+	root.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	root.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+
+	var frame := TextureRect.new()
+	frame.texture = load(frame_path)
+	frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	frame.stretch_mode = TextureRect.STRETCH_SCALE
+	frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(frame)
+
+	var region := Rect2(inner.position.x * bar_size.x, inner.position.y * bar_size.y, inner.size.x * bar_size.x, inner.size.y * bar_size.y)
+	var clip := Control.new()
+	clip.position = region.position
+	clip.size = region.size
+	clip.clip_contents = true
+	clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var fill := TextureRect.new()
+	fill.texture = load(fill_path)
+	fill.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	fill.stretch_mode = TextureRect.STRETCH_SCALE
+	fill.position = Vector2.ZERO
+	fill.size = region.size
+	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	clip.add_child(fill)
+	root.add_child(clip)
+
+	var label: Label = null
+	if with_label:
+		label = Label.new()
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		label.add_theme_font_size_override("font_size", 17)
+		label.add_theme_color_override("font_color", Color("f6efdb"))
+		label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.85))
+		label.add_theme_constant_override("shadow_offset_x", 1)
+		label.add_theme_constant_override("shadow_offset_y", 1)
+		label.position = region.position
+		label.size = region.size
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(label)
+
+	return {"root": root, "clip": clip, "region": region, "label": label}
+
+func _update_bar(bar: Dictionary, pct: float, text: String) -> void:
+	if bar.is_empty():
+		return
+	pct = clampf(pct, 0.0, 1.0)
+	var region: Rect2 = bar.region
+	bar.clip.size = Vector2(region.size.x * pct, region.size.y)
+	if bar.label != null:
+		bar.label.text = text
 
 func _on_finished(result: String) -> void:
 	result_label.text = result; result_label.modulate = Color("e7c778") if result == "VICTORY" else Color("ef6a74"); overlay.show()
