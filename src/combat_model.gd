@@ -43,14 +43,15 @@ func start(seed_value: int = 0) -> void:
 	state_changed.emit()
 
 func advance(delta: float) -> void:
-	if state != "RUNNING":
+	if state != "RUNNING" and state != "PLAYER_TURN":
 		return
-	player_progress += player_speed * TURN_PROGRESS_MULTIPLIER * delta
+	# A ready player keeps their full gauge and current choices, but time does not
+	# stop: the enemy continues charging and attacking while the player decides.
+	player_progress = minf(TURN_THRESHOLD, player_progress + player_speed * TURN_PROGRESS_MULTIPLIER * delta)
 	enemy_progress += enemy_speed * TURN_PROGRESS_MULTIPLIER * delta
-	if player_progress >= TURN_THRESHOLD:
-		player_progress = TURN_THRESHOLD
+	if player_progress >= TURN_THRESHOLD and state == "RUNNING":
 		_begin_player_turn()
-	elif enemy_progress >= TURN_THRESHOLD:
+	while enemy_progress >= TURN_THRESHOLD and state != "GAME_OVER":
 		_enemy_turn()
 	state_changed.emit()
 
@@ -97,12 +98,12 @@ func _enemy_turn() -> void:
 	var health_damage: int = enemy_damage - absorbed
 	player_health = maxi(0, player_health - health_damage)
 	player_block = 0
-	enemy_progress = 0.0
+	enemy_progress -= TURN_THRESHOLD
 	battle_log = "Enemy attacks for %d. Block absorbs %d; you take %d." % [enemy_damage, absorbed, health_damage]
 	if player_health <= 0:
 		_finish("DEFEAT")
 	else:
-		state = "RUNNING"
+		state = "PLAYER_TURN" if not choices.is_empty() else "RUNNING"
 
 func _finish(result: String) -> void:
 	state = "GAME_OVER"
