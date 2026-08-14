@@ -2,7 +2,7 @@
 
 A first playable Godot 4 implementation of the combat loop in [DESIGN.md](DESIGN.md): speed-based turns, temporary three-card choices, cross-turn chains, block, and win/lose states.
 
-Turn gauges fill at 300% of their original rate (a 200% speed increase) while preserving the player's and enemy's relative Speed values.
+Turn gauges fill at 300% of their original rate (a 200% speed increase) while preserving the player's and enemy's relative Speed values. Both gauges run independently: the enemy attacks whenever its gauge fills, including while the player is choosing, and the player's choices remain available until an ability is used.
 
 ## Setup and run
 

@@ -7,6 +7,8 @@ func _init() -> void:
 	_test_turn_gauges_are_200_percent_faster()
 	_test_chain_damage_and_discard()
 	_test_block_and_enemy_attack()
+	_test_enemy_keeps_acting_during_player_turn()
+	_test_player_becomes_ready_while_enemy_keeps_acting()
 	_test_win_and_loss()
 	_test_ability_buttons_remain_clickable()
 	if failures == 0: print("All combat model tests passed.")
@@ -44,6 +46,24 @@ func _test_block_and_enemy_attack() -> void:
 	model.advance(1.0)
 	check(model.player_health == 38, "Block absorbs damage before health")
 	check(model.player_block == 0, "Block clears after an enemy attack")
+
+func _test_enemy_keeps_acting_during_player_turn() -> void:
+	var model := CombatModel.new(); model.start(22)
+	model.advance(10.0)
+	check(model.state == "PLAYER_TURN" and model.choices.size() == 3, "Player gets ability choices when their gauge fills")
+	var choices_before := model.choices.duplicate(true)
+	var health_before := model.player_health
+	model.advance(5.0)
+	check(model.player_health < health_before, "Enemy attacks even while the player is choosing an ability")
+	check(model.state == "PLAYER_TURN" and model.choices == choices_before, "Enemy attacks do not dismiss the player's ready turn")
+	check(model.player_progress == CombatModel.TURN_THRESHOLD, "A ready player's gauge remains full until an ability is used")
+
+func _test_player_becomes_ready_while_enemy_keeps_acting() -> void:
+	var model := CombatModel.new(); model.start(23)
+	model.player_speed = 7.0; model.enemy_speed = 10.0
+	model.advance(10.0)
+	check(model.player_health < model.player_max_health, "Enemy acts whenever its gauge fills")
+	check(model.state == "PLAYER_TURN" and model.choices.size() == 3, "Player still receives a turn whenever their gauge fills")
 
 func _test_win_and_loss() -> void:
 	var model := CombatModel.new(); model.start(3); model.enemy_health = 3; model.state = "PLAYER_TURN"; model.choices = [model._card("Slash", "BLADE", 6)]
