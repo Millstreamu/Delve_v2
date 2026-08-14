@@ -6,6 +6,8 @@ var enemy_timer_bar: Dictionary
 var player_health_bar: Dictionary
 var player_timer_bar: Dictionary
 var chain_label: Label
+var stats_label: Label
+var equipment_labels: Dictionary = {}
 var log_label: Label
 var cards: HBoxContainer
 var overlay: ColorRect
@@ -29,19 +31,20 @@ func _build_ui() -> void:
 	add_child(background)
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 72); margin.add_theme_constant_override("margin_right", 72)
-	margin.add_theme_constant_override("margin_top", 38); margin.add_theme_constant_override("margin_bottom", 38)
+	margin.add_theme_constant_override("margin_top", 12); margin.add_theme_constant_override("margin_bottom", 12)
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(margin)
-	var column := VBoxContainer.new(); column.add_theme_constant_override("separation", 12); margin.add_child(column)
+	var column := VBoxContainer.new(); column.add_theme_constant_override("separation", 6); margin.add_child(column)
 	var title := Label.new(); title.text = "D E L V E"; title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; title.add_theme_font_size_override("font_size", 28); title.modulate = Color("e7c778"); column.add_child(title)
 	enemy_health_bar = _make_stat_bar(HP_FRAME, HP_FILL, HP_INNER, HEALTH_BAR_SIZE, true)
 	enemy_timer_bar = _make_stat_bar(TIMER_FRAME, TIMER_FILL, TIMER_INNER, TIMER_BAR_SIZE, false)
 	column.add_child(_bar_row(enemy_health_bar, enemy_timer_bar))
-	var enemy_visual := Label.new(); enemy_visual.text = "◆  THE WARDEN"; enemy_visual.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; enemy_visual.add_theme_font_size_override("font_size", 30); enemy_visual.modulate = Color("ef6a74"); enemy_visual.custom_minimum_size.y = 46; column.add_child(enemy_visual)
+	var enemy_visual := Label.new(); enemy_visual.text = "◆  THE WARDEN"; enemy_visual.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; enemy_visual.add_theme_font_size_override("font_size", 30); enemy_visual.modulate = Color("ef6a74"); enemy_visual.custom_minimum_size.y = 38; column.add_child(enemy_visual)
 	var divider := HSeparator.new(); column.add_child(divider)
 	player_health_bar = _make_stat_bar(HP_FRAME, HP_FILL, HP_INNER, HEALTH_BAR_SIZE, true)
 	player_timer_bar = _make_stat_bar(TIMER_FRAME, TIMER_FILL, TIMER_INNER, TIMER_BAR_SIZE, false)
 	column.add_child(_bar_row(player_health_bar, player_timer_bar))
+	_build_equipment_ui(column)
 	chain_label = _label(16); chain_label.modulate = Color("e7c778"); column.add_child(chain_label)
 	log_label = _label(16); log_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; log_label.custom_minimum_size.y = 42; column.add_child(log_label)
 	cards = HBoxContainer.new(); cards.alignment = BoxContainer.ALIGNMENT_CENTER; cards.add_theme_constant_override("separation", 18); cards.size_flags_vertical = Control.SIZE_EXPAND_FILL; column.add_child(cards)
@@ -55,9 +58,46 @@ func _refresh() -> void:
 	_update_bar(player_health_bar, float(model.player_health) / model.player_max_health, "%d / %d HP    •    %d BLOCK" % [model.player_health, model.player_max_health, model.player_block])
 	_update_bar(enemy_timer_bar, model.enemy_progress / CombatModel.TURN_THRESHOLD, "")
 	_update_bar(player_timer_bar, model.player_progress / CombatModel.TURN_THRESHOLD, "")
+	stats_label.text = "ATTACK  %d     POWER  %d     DEFENCE  %d     SPEED  %d" % [model.get_stat("attack"), model.get_stat("power"), model.get_stat("defence"), model.get_stat("speed")]
+	for slot: String in equipment_labels:
+		var item: Dictionary = model.equipment[slot]
+		equipment_labels[slot].text = _equipment_text(slot, item)
 	chain_label.text = "LAST ABILITY: %s" % (model.last_ability_type if model.last_ability_type != "" else "NONE — start a chain")
 	log_label.text = model.battle_log
 	_refresh_abilities()
+
+func _build_equipment_ui(column: VBoxContainer) -> void:
+	stats_label = _label(16)
+	stats_label.modulate = Color("9fd6ff")
+	column.add_child(stats_label)
+	var slots := HBoxContainer.new()
+	slots.alignment = BoxContainer.ALIGNMENT_CENTER
+	slots.add_theme_constant_override("separation", 8)
+	column.add_child(slots)
+	for slot in ["head", "chest", "legs", "boots", "left_hand", "right_hand"]:
+		var panel := PanelContainer.new()
+		panel.custom_minimum_size = Vector2(145, 48)
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color("111c31")
+		style.border_color = Color("415679")
+		style.set_border_width_all(1)
+		style.set_corner_radius_all(4)
+		panel.add_theme_stylebox_override("panel", style)
+		var label := _label(11)
+		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		panel.add_child(label)
+		slots.add_child(panel)
+		equipment_labels[slot] = label
+
+func _equipment_text(slot: String, item: Dictionary) -> String:
+	var heading := slot.replace("_", " ").to_upper()
+	if item.is_empty():
+		return "%s\n— EMPTY —" % heading
+	var bonuses: Array[String] = []
+	for stat in ["attack", "power", "defence", "speed"]:
+		if item.get(stat, 0) != 0:
+			bonuses.append("+%d %s" % [item[stat], stat.to_upper()])
+	return "%s\n%s  %s" % [heading, item.name, " ".join(bonuses)]
 
 func _refresh_abilities() -> void:
 	var next_signature := model.state + ":" + JSON.stringify(model.choices)
@@ -170,7 +210,9 @@ func _ability_card(ability: Dictionary, index: int) -> Button:
 
 func _card_description(ability: Dictionary, accent: Color, active: bool) -> String:
 	var lines: Array[String] = []
-	lines.append(model._effect_summary(ability.damage, ability.block, ability.heal).capitalize())
+	var effects := model.ability_effects(ability, false)
+	lines.append(model._effect_summary(effects.damage, effects.block, effects.heal).capitalize())
+	lines.append("[color=#8fa3bf]Scales with %s[/color]" % str(ability.scales_with).capitalize())
 	if ability.chain_type != "":
 		var tag := "CHAIN: %s" % ability.chain_type
 		lines.append("[color=#%s]%s[/color]" % [accent.to_html(false), tag])
