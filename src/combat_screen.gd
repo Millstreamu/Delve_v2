@@ -10,6 +10,7 @@ var log_label: Label
 var cards: HBoxContainer
 var overlay: ColorRect
 var result_label: Label
+var cards_signature := ""
 
 func _ready() -> void:
 	_build_ui()
@@ -53,9 +54,19 @@ func _refresh() -> void:
 	enemy_bar.value = model.enemy_progress; player_bar.value = model.player_progress
 	chain_label.text = "LAST ABILITY: %s" % (model.last_ability_type if model.last_ability_type != "" else "NONE — start a chain")
 	log_label.text = model.battle_log
-	for child in cards.get_children(): child.queue_free()
+	_refresh_abilities()
+
+func _refresh_abilities() -> void:
+	var next_signature := model.state + ":" + JSON.stringify(model.choices)
+	if next_signature == cards_signature:
+		return
+	cards_signature = next_signature
+	for child in cards.get_children():
+		cards.remove_child(child)
+		child.queue_free()
 	if model.state == "PLAYER_TURN":
-		for i in model.choices.size(): cards.add_child(_ability_button(model.choices[i], i))
+		for i in model.choices.size():
+			cards.add_child(_ability_button(model.choices[i], i))
 	else:
 		var waiting := _label(17); waiting.text = "Turn gauges are filling…"; waiting.modulate = Color("8190a8"); cards.add_child(waiting)
 
