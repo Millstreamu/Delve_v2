@@ -27,9 +27,16 @@ func _process(delta: float) -> void:
 
 func _build_ui() -> void:
 	var background := ColorRect.new()
-	background.color = Color("0b0a14")
+	background.color = Color("06040a")
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(background)
+	var bg_art := TextureRect.new()
+	bg_art.texture = load("res://assets/bg_combat.png")
+	bg_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bg_art.stretch_mode = TextureRect.STRETCH_SCALE
+	bg_art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(bg_art)
 	var layer := Control.new()
 	layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -61,7 +68,7 @@ func _build_ui() -> void:
 	enemy_health_bar = _make_stat_bar(HP_FRAME, HP_FILL, HP_INNER, HEALTH_BAR_SIZE, true)
 	_place_abs(layer, enemy_health_bar.root, 640 - HEALTH_BAR_SIZE.x / 2, 42, HEALTH_BAR_SIZE.x, HEALTH_BAR_SIZE.y)
 	enemy_timer_bar = _make_stat_bar(TIMER_FRAME, TIMER_FILL, TIMER_INNER, TIMER_BAR_SIZE, false)
-	_place_abs(layer, enemy_timer_bar.root, 640 - TIMER_BAR_SIZE.x / 2, 100, TIMER_BAR_SIZE.x, TIMER_BAR_SIZE.y)
+	_place_abs(layer, enemy_timer_bar.root, 640 - HEALTH_BAR_SIZE.x / 2, 100, TIMER_BAR_SIZE.x, TIMER_BAR_SIZE.y)
 
 	# Card hand (lower-left band).
 	cards = HBoxContainer.new()
@@ -343,7 +350,7 @@ func _label(size: int) -> Label:
 const HP_FRAME := "res://assets/hp_frame.png"
 const HP_FILL := "res://assets/hp_fill.png"
 const TIMER_FRAME := "res://assets/timer_frame.png"
-const TIMER_FILL := "res://assets/timer_fill.png"
+const TIMER_FILL := "res://assets/timer_fill_blue.png"
 # Inner fill channel of each frame, measured from the cropped sprites.
 const HP_INNER := Rect2(0.1489, 0.0696, 0.8223, 0.8797)
 const TIMER_INNER := Rect2(0.1340, 0.0652, 0.8482, 0.9293)
