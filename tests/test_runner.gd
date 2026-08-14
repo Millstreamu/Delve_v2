@@ -7,6 +7,7 @@ func _init() -> void:
 	_test_chain_damage_and_discard()
 	_test_block_and_enemy_attack()
 	_test_win_and_loss()
+	_test_ability_buttons_remain_clickable()
 	if failures == 0: print("All combat model tests passed.")
 	quit(failures)
 
@@ -42,3 +43,16 @@ func _test_win_and_loss() -> void:
 	model.play_choice(0); check(model.state == "GAME_OVER" and model.enemy_health == 0, "Enemy reaching zero produces game over")
 	model.start(4); model.player_health = 2; model.enemy_progress = 99.0; model.advance(1.0)
 	check(model.state == "GAME_OVER" and model.player_health == 0, "Player reaching zero produces game over")
+
+func _test_ability_buttons_remain_clickable() -> void:
+	var screen = preload("res://src/combat_screen.gd").new()
+	screen._build_ui()
+	screen.model.state = "PLAYER_TURN"
+	screen.model.choices.append(screen.model._card("Slash", "BLADE", 6))
+	screen._refresh()
+	var button := screen.cards.get_child(0) as Button
+	screen._refresh()
+	check(screen.cards.get_child(0) == button, "Refreshing the HUD must not replace an ability button before it can be clicked")
+	button.pressed.emit()
+	check(screen.model.enemy_health == 44 and screen.model.state == "RUNNING", "Clicking an ability button plays that choice")
+	screen.free()
